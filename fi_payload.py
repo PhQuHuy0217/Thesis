@@ -1,6 +1,5 @@
 # -*- coding: utf-8 -*-
 
-import urllib.parse as urllib
 import sys
 import time
 import requests
