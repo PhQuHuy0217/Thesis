@@ -8,6 +8,7 @@ url = input("\n[*] Enter url: -> ")
 HEADERS = {
 	'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/75.0.3770.80 Safari/537.36'
 	}
+
 input_cookie = input("\n[*] Enter cookies if needed (ex: 'PHPSESSID=12345;par=something') [just enter if none] -> ")
 if len(input_cookie) > 0:
 	HEADERS['Cookie'] = input_cookie
@@ -91,46 +92,3 @@ def main():
 	post(url, HEADERS, parameters, qStrNum)
 
 main()
-
-#print(attributes)
-# print ("Choose tag number to attack:")
-# tag_length = len(tag)
-# for i in range(0, tag_length):
-	# print (tag[i])
-	# result = input("-> ")
-	# if result == 'y' or result == 'Y':
-		# pass
-	
-# for form in soup.find_all('form'):
-	# para = []
-	# para.append(form.get('action'))
-	# para.append(form.get('method'))
-
-	# for select in form.find_all('select'):
-		# para.append(select.get('name'))
-		# for option in select.find_all('option'):
-			# para.append(option.get('value'))
-			#print (option.get('value'))
-		#print (select)
-		#print (select.get('name'))
-		#print (option.get('value'))
-	# for input in form.find_all('input'):
-		# para.append(input.get('name'))
-		# if input.get('value') is not None:
-			# para.append(input.get('value'))
-		# print(input)
-		# print(input.get('name'))
-		# print(input.get('value'))
-
-	#print(para)
-	# if(para[1] == 'post'):
-		# payload = {}
-		# payload[para[2]] = username
-		# payload[para[3]] = password
-		# payload[para[4]] = para[5]
-		# r = s.post(url + para[0], data = payload, headers=HEADERS)
-		# print(r.text)
-	#print (form)
-#r = s.get('http://10.1.1.100/dvwa/vulnerabilities/sqli/', headers=HEADERS)
-#print(r.text)
-#print(r.cookies)
